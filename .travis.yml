@@ -1,0 +1,18 @@
+language: python
+python:
+  - 3.6
+
+sudo: false
+
+cache:
+  - pip
+
+install:
+  - pip install -e .[test]
+
+script:
+  - flake8 .
+  - mypy --ignore-missing-imports htttea.py
+  - py.test tests.py --cov=htttea --cov-report term-missing
+  - rst2html.py README.rst --exit-status=2 > /dev/null
+  - rst2html.py CHANGELOG.rst --exit-status=2 > /dev/null
