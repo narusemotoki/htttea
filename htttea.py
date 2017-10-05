@@ -1,9 +1,11 @@
 import cgi
+import datetime
 import errno
 import http
 import random
 import tempfile
 import threading
+import time
 from typing import (
     Any,
     Callable,
@@ -17,14 +19,22 @@ import wsgiref.handlers
 import wsgiref.simple_server
 
 
-__all__ = ['Htttea', 'Response']
+__all__ = ['Htttea', 'Response', 'HttteaError', 'TimeoutError']
 __author__ = "Motoki Naruse"
 __copyright__ = "Motoki Naruse"
 __credits__ = ["Motoki Naruse"]
 __email__ = "motoki@naru.se"
 __license__ = "MIT"
 __maintainer__ = "Motoki Naruse"
-__version__ = '0.0.1'
+__version__ = '0.1.0'
+
+
+class HttteaError(Exception):
+    pass
+
+
+class TimeoutError(HttteaError):
+    pass
 
 
 class Response:
@@ -69,6 +79,7 @@ class Application:
     def __init__(self) -> None:
         self.response = Response()
         self.request = Request()
+        self.requested = False
 
     def _to_data(self, body: bytes, environ: Dict[str, Any]) -> Dict[str, Any]:
         with tempfile.TemporaryFile() as f:
@@ -95,6 +106,7 @@ class Application:
             pass
 
         self.request.path = environ['PATH_INFO']
+        self.requested = True
         start_response(
             "{} {}".format(self.response.status.value, self.response.status.name),
             [
@@ -169,3 +181,13 @@ class Htttea:
     def __exit__(self, exec_type, exec_value, exec_traceback) -> bool:
         self._server.stop()
         return False
+
+    def wait_until_request(self, *, timeout: float=10.0) -> None:
+        elapsed_time = 0.0
+        reference_time = datetime.datetime.now()
+        while elapsed_time < timeout and not self._application.requested:
+            time.sleep(0.01)
+            elapsed_time = (datetime.datetime.now() - reference_time).total_seconds()
+
+        if not self._application.requested:
+            raise TimeoutError("No request in {} seconds".format(timeout))
